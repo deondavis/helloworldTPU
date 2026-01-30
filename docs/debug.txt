@@ -8,6 +8,7 @@ Summary of failure (fixed):
 Root cause:
 - MMIO address stride for the C window was wrong: CPU read/write logic used byte offsets but C is word-addressed (idx*4). Reads were aliasing to the first word lane.
 - TPU MMIO decode in the SoC also forwarded byte-lane writes without lane-shifting the address/data to the TPU block.
+- Firmware load format: `$readmemh` needs word-addressed Verilog hex (one 32-bit word per line). A bytewise hex dump/binary caused “not enough words” and left instructions as X/zero, leading to bogus buffers. Using `objcopy -O verilog` fixed RAM init.
 
 Fixes applied:
 - `rtl/tpu_accel/tpu_regs.v`: C window read index now uses `(mmio_addr - C_BASE) >> 2`; buffer write addresses use full byte offsets (no shared mmio_low).
