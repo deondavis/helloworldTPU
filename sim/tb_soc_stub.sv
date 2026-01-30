@@ -48,6 +48,20 @@ module tb_soc_stub;
                  dut.ram[SIG_WORD+0], dut.ram[SIG_WORD+1], dut.ram[SIG_WORD+2]);
         $display("soc_stub: tpu state=%0d busy=%0b done=%0b t_ctr=%0d",
                  dut.u_tpu.state, dut.u_tpu.busy, dut.u_tpu.done, dut.u_tpu.t_ctr);
+        $display("TPU debug: state=%0d busy=%0b done=%0b t_ctr=%0d capture_sums=%0b",
+                 dut.u_tpu.state, dut.u_tpu.busy, dut.u_tpu.done, dut.u_tpu.t_ctr, dut.u_tpu.capture_sums);
+        $display("TPU buffers A:");
+        for (int i = 0; i < 16; i++) begin
+            $display("  A[%0d]=%0d", i, dut.u_tpu.u_buf.a_mem[i]);
+        end
+        $display("TPU buffers B:");
+        for (int i = 0; i < 16; i++) begin
+            $display("  B[%0d]=%0d", i, dut.u_tpu.u_buf.b_mem[i]);
+        end
+        $display("TPU buffers C:");
+        for (int i = 0; i < 16; i++) begin
+            $display("  C[%0d]=%0d", i, dut.u_tpu.u_buf.c_mem[i]);
+        end
         if (dut.ram[SIG_WORD+0] !== 32'hBEEF0000) begin
             $fatal(1, "Firmware signature mismatch (got 0x%08x obs=0x%08x gold=0x%08x)",
                    dut.ram[SIG_WORD+0], dut.ram[SIG_WORD+1], dut.ram[SIG_WORD+2]);

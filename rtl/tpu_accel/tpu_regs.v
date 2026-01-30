@@ -54,8 +54,6 @@ module tpu_regs #(
     wire start_pulse = mmio_wr && (mmio_addr == CTRL_ADDR) && mmio_wdata[0] && !busy;
     wire clear_done  = mmio_wr && (mmio_addr == CTRL_ADDR) && mmio_wdata[1];
 
-    wire [ADDR_W-1:0] mmio_low = mmio_addr[ADDR_W-1:0];
-
     function automatic [DATA_W-1:0] get_a(input [DATA_W*N*N-1:0] vec, input int idx);
         get_a = vec[idx*DATA_W +: DATA_W];
     endfunction
@@ -78,11 +76,11 @@ module tpu_regs #(
             end else if (mmio_addr == STATUS_ADDR) begin
                 mmio_rdata = {30'b0, done, busy};
             end else if ((mmio_addr >= A_BASE) && (mmio_addr < (A_BASE + MAT_ELEMS))) begin
-                mmio_rdata = {24'h0, get_a(a_flat, mmio_low)};
+                mmio_rdata = {24'h0, get_a(a_flat, mmio_addr - A_BASE)};
             end else if ((mmio_addr >= B_BASE) && (mmio_addr < (B_BASE + MAT_ELEMS))) begin
-                mmio_rdata = {24'h0, get_b(b_flat, mmio_low)};
-            end else if ((mmio_addr >= C_BASE) && (mmio_addr < (C_BASE + MAT_ELEMS))) begin
-                mmio_rdata = get_c(c_flat, mmio_low);
+                mmio_rdata = {24'h0, get_b(b_flat, mmio_addr - B_BASE)};
+            end else if ((mmio_addr >= C_BASE) && (mmio_addr < (C_BASE + (MAT_ELEMS * 4)))) begin
+                mmio_rdata = get_c(c_flat, (mmio_addr - C_BASE) >> 2);
             end
         end
     end
@@ -90,8 +88,8 @@ module tpu_regs #(
     // Decode buffer writes (combinational strobes).
     assign we_a    = mmio_wr && (mmio_addr >= A_BASE) && (mmio_addr < (A_BASE + MAT_ELEMS));
     assign we_b    = mmio_wr && (mmio_addr >= B_BASE) && (mmio_addr < (B_BASE + MAT_ELEMS));
-    assign addr_a  = mmio_low;
-    assign addr_b  = mmio_low;
+    assign addr_a  = mmio_addr - A_BASE;
+    assign addr_b  = mmio_addr - B_BASE;
     assign wdata_a = mmio_wdata[DATA_W-1:0];
     assign wdata_b = mmio_wdata[DATA_W-1:0];
 

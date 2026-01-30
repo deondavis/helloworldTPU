@@ -73,16 +73,16 @@ module tb_mac_array;
 
     // Initialize matrices and compute golden C = A * B.
     initial begin
-        // A matrix
-        A[0][0] = 1; A[0][1] = 2; A[0][2] = 3; A[0][3] = 4;
-        A[1][0] = 5; A[1][1] = 6; A[1][2] = 7; A[1][3] = 8;
-        A[2][0] = 9; A[2][1] = 1; A[2][2] = 2; A[2][3] = 3;
-        A[3][0] = 4; A[3][1] = 5; A[3][2] = 6; A[3][3] = 7;
+        // A matrix (match firmware)
+        A[0][0] = 1;  A[0][1] = 2;  A[0][2] = 3;  A[0][3] = 4;
+        A[1][0] = 5;  A[1][1] = 6;  A[1][2] = 7;  A[1][3] = 8;
+        A[2][0] = 9;  A[2][1] = 10; A[2][2] = 11; A[2][3] = 12;
+        A[3][0] = 13; A[3][1] = 14; A[3][2] = 15; A[3][3] = 16;
 
-        // B matrix
-        B[0][0] = 1; B[0][1] = 0; B[0][2] = 2; B[0][3] = 1;
-        B[1][0] = 0; B[1][1] = 1; B[1][2] = 1; B[1][3] = 0;
-        B[2][0] = 1; B[2][1] = 1; B[2][2] = 0; B[2][3] = 1;
+        // B matrix (match firmware)
+        B[0][0] = 2; B[0][1] = 1; B[0][2] = 0; B[0][3] = 3;
+        B[1][0] = 1; B[1][1] = 0; B[1][2] = 2; B[1][3] = 1;
+        B[2][0] = 3; B[2][1] = 1; B[2][2] = 1; B[2][3] = 0;
         B[3][0] = 0; B[3][1] = 2; B[3][2] = 1; B[3][3] = 1;
 
         // Golden reference
@@ -96,7 +96,36 @@ module tb_mac_array;
         end
     end
 
+    integer cycle = 0;
+    integer capture_cycle = -1;
+    logic busy_q;
+
+    always @(posedge clk) begin
+        busy_q <= dut.busy;
+        if (rst) begin
+            cycle <= 0;
+            capture_cycle <= -1;
+        end else begin
+            cycle <= cycle + 1;
+            if (dut.capture_sums) begin
+                capture_cycle = cycle;
+                $display("capture_sums asserted at cycle=%0d t_ctr=%0d state=%0d", cycle, dut.t_ctr, dut.state);
+            end
+            if (busy_q && !dut.busy) begin
+                $display("busy dropped at cycle=%0d t_ctr=%0d state=%0d", cycle, dut.t_ctr, dut.state);
+            end
+        end
+    end
+
     initial begin
+        int mismatches;
+        int first_r;
+        int first_c;
+        int first_obs;
+        int first_gold;
+        int unsigned checksum_obs;
+        int unsigned checksum_gold;
+
         $dumpfile("outputs/wave.vcd");
         $dumpvars(0, tb_mac_array);
 
@@ -138,17 +167,38 @@ module tb_mac_array;
 
         // Read back C matrix and check.
         $display("Observed C (sum):");
+        mismatches = 0;
+        first_r = -1;
+        first_c = -1;
+        first_obs = 0;
+        first_gold = 0;
+        checksum_obs = 0;
+        checksum_gold = 0;
         for (int r = 0; r < N; r++) begin
             for (int c = 0; c < N; c++) begin
-                mmio_read(C_BASE + (r * N + c), status);
+                mmio_read(C_BASE + ((r * N + c) << 2), status);
                 observed = status;
+                checksum_obs += observed;
+                checksum_gold += GOLD[r][c];
                 $display("C[%0d][%0d] = %0d (golden %0d)", r, c, observed, GOLD[r][c]);
                 if (observed[15:0] !== GOLD[r][c][15:0]) begin
-                    $fatal(1, "Mismatch at (%0d,%0d): got %0d expected %0d", r, c, observed, GOLD[r][c]);
+                    if (mismatches == 0) begin
+                        first_r = r;
+                        first_c = c;
+                        first_obs = observed;
+                        first_gold = GOLD[r][c];
+                    end
+                    mismatches++;
                 end
             end
         end
-        $display("PASS");
-        $finish;
+        $display("checksum_obs=0x%08x checksum_gold=0x%08x mismatches=%0d", checksum_obs, checksum_gold, mismatches);
+        if (mismatches != 0) begin
+            $fatal(1, "Mismatch count %0d first (%0d,%0d) got %0d expected %0d",
+                   mismatches, first_r, first_c, first_obs, first_gold);
+        end else begin
+            $display("PASS");
+            $finish;
+        end
     end
 endmodule

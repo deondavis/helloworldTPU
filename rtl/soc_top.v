@@ -151,10 +151,11 @@ module soc_top #(
             if (mem_wstrb[2]) ram[ram_word_addr][23:16] <= mem_wdata[23:16];
             if (mem_wstrb[3]) ram[ram_word_addr][31:24] <= mem_wdata[31:24];
 
-            // Debug: watch all low-RAM writes and signature address writes.
-            if ((mem_addr[15:0] < 16'h0040) || (mem_addr[15:0] == 16'h0000)) begin
-                $display("%0t soc_top DBG RAM wr @%08x data=%08x wstrb=%b", $time, mem_addr, mem_wdata, mem_wstrb);
-            end
+`ifdef SIM
+        // Debug: watch all low-RAM writes and signature address writes.
+        if ((mem_addr[15:0] < 16'h0040) || (mem_addr[15:0] == 16'h0000)) begin
+            $display("%0t soc_top DBG RAM wr @%08x data=%08x wstrb=%b", $time, mem_addr, mem_wdata, mem_wstrb);
+        end
         end
 
         // One-shot debug for any write.
@@ -162,6 +163,7 @@ module soc_top #(
             wrote_once <= 1'b1;
             $display("%0t soc_top DBG ANY write @%08x data=%08x wstrb=%b", $time, mem_addr, mem_wdata, mem_wstrb);
         end
+`endif
     end
 
 `ifdef SIM
@@ -180,9 +182,18 @@ module soc_top #(
     wire        tpu_sel   = mem_valid && ((mem_addr & TPU_ADDR_MASK) == TPU_BASE_ADDR);
     wire        tpu_wr    = tpu_sel && (|mem_wstrb);
     wire        tpu_rd    = tpu_sel && !tpu_wr;
-    wire [15:0] tpu_addr  = mem_addr[15:0];
-    wire [31:0] tpu_wdata = mem_wdata;
-    wire [3:0]  tpu_wstrb = mem_wstrb;
+
+    // PicoRV32 presents word-aligned mem_addr with byte enables in mem_wstrb.
+    // For byte/halfword writes, advance the address by the active byte lane and
+    // shift the data accordingly so the TPU sees the true byte offset.
+    wire [1:0] tpu_lane = mem_wstrb[0] ? 2'd0 :
+                          mem_wstrb[1] ? 2'd1 :
+                          mem_wstrb[2] ? 2'd2 :
+                          mem_wstrb[3] ? 2'd3 : 2'd0;
+
+    wire [15:0] tpu_addr  = mem_addr[15:0] + tpu_lane;
+    wire [31:0] tpu_wdata = mem_wdata >> (8 * tpu_lane);
+    wire [3:0]  tpu_wstrb = (mem_wstrb != 4'b0) ? (4'b0001 << tpu_lane) : 4'b0000;
     wire [31:0] tpu_rdata;
     wire        tpu_ready;
 
@@ -206,10 +217,12 @@ module soc_top #(
     assign mem_rdata = tpu_sel ? tpu_rdata :
                        ram_sel ? ram_rdata : 32'h0;
 
+`ifdef SIM
     // Instruction fetch tracing for debug.
     always_ff @(posedge clk) begin
         if (mem_valid && mem_instr) begin
             $display("%0t soc_top DBG IFETCH addr=%08x", $time, mem_addr);
         end
     end
+`endif
 endmodule

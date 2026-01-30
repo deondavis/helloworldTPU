@@ -1,20 +1,24 @@
 IVERILOG = iverilog
-IVERILOG_FLAGS = -g2012 -DSIM
+SIM_DEFS ?= 1
+IVERILOG_FLAGS = -g2012
+ifeq ($(SIM_DEFS),1)
+IVERILOG_FLAGS += -DSIM
+endif
 VVP      = vvp
 GTK      = gtkwave
 
 ROOT := $(abspath ..)
 RTL  := $(ROOT)/rtl/tpu_accel
-SIM  := $(ROOT)/sim
+SIMDIR  := $(ROOT)/sim
 OUT_DIR := $(ROOT)/outputs
 
-SRC = $(RTL)/pe.v $(RTL)/mac_array_4x4.v $(RTL)/tpu_buffers.v $(RTL)/tpu_regs.v $(RTL)/tpu_top.v $(SIM)/tb_mac_array.sv
+SRC = $(RTL)/pe.v $(RTL)/mac_array_4x4.v $(RTL)/tpu_buffers.v $(RTL)/tpu_regs.v $(RTL)/tpu_top.v $(SIMDIR)/tb_mac_array.sv
 TOP = tb_mac_array
 OUT = $(OUT_DIR)/simv
 
 SOC_SRC = $(ROOT)/rtl/third_party/picorv32.v $(RTL)/pe.v $(RTL)/mac_array_4x4.v \
           $(RTL)/tpu_buffers.v $(RTL)/tpu_regs.v $(RTL)/tpu_top.v \
-          $(ROOT)/rtl/soc_top.v $(SIM)/tb_soc_stub.sv
+          $(ROOT)/rtl/soc_top.v $(SIMDIR)/tb_soc_stub.sv
 SOC_TOP = tb_soc_stub
 SOC_OUT = $(OUT_DIR)/soc_simv
 SOC_HEX = $(OUT_DIR)/tpu_smoke.hex
