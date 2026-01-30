@@ -111,14 +111,18 @@ module soc_top #(
     );
 
     // On-chip RAM (simple single-ported BRAM style).
-    reg [31:0] ram [0:MEM_WORDS-1];
+    reg [7:0]  ram [0:MEM_BYTES-1];
     reg [31:0] ram_rdata;
     reg        ram_ready;
 
     // Avoid Xs when no firmware is provided.
     initial begin
+        // Fill with NOPs (0x00000013) to avoid Xs.
         for (int i = 0; i < MEM_WORDS; i++) begin
-            ram[i] = 32'h0000_0013; // ADDI x0, x0, 0 (NOP)
+            ram[(i<<2)+0] = 8'h13;
+            ram[(i<<2)+1] = 8'h00;
+            ram[(i<<2)+2] = 8'h00;
+            ram[(i<<2)+3] = 8'h00;
         end
         if (FIRMWARE_HEX != "") begin
             $display("soc_top: loading firmware from %s", FIRMWARE_HEX);
@@ -128,6 +132,7 @@ module soc_top #(
 
     wire ram_sel = mem_valid && (mem_addr[31:2] < MEM_WORDS) && (mem_addr[31:28] == 4'h0);
     wire [RAM_ADDR_W-1:0] ram_word_addr = mem_addr[RAM_ADDR_W+1:2];
+    wire [RAM_ADDR_W+1:0] ram_byte_addr = {ram_word_addr, 2'b00};
 
     always_ff @(posedge clk) begin
         ram_ready <= 1'b0;
@@ -135,13 +140,25 @@ module soc_top #(
             ram_ready <= 1'b0;
         end else if (ram_sel) begin
             ram_ready <= 1'b1;
-            ram_rdata <= ram[ram_word_addr];
-            if (mem_wstrb[0]) ram[ram_word_addr][7:0]   <= mem_wdata[7:0];
-            if (mem_wstrb[1]) ram[ram_word_addr][15:8]  <= mem_wdata[15:8];
-            if (mem_wstrb[2]) ram[ram_word_addr][23:16] <= mem_wdata[23:16];
-            if (mem_wstrb[3]) ram[ram_word_addr][31:24] <= mem_wdata[31:24];
+            ram_rdata <= {ram[ram_byte_addr + 3], ram[ram_byte_addr + 2], ram[ram_byte_addr + 1], ram[ram_byte_addr]};
+            if (mem_wstrb[0]) ram[ram_byte_addr + 0] <= mem_wdata[7:0];
+            if (mem_wstrb[1]) ram[ram_byte_addr + 1] <= mem_wdata[15:8];
+            if (mem_wstrb[2]) ram[ram_byte_addr + 2] <= mem_wdata[23:16];
+            if (mem_wstrb[3]) ram[ram_byte_addr + 3] <= mem_wdata[31:24];
         end
     end
+
+`ifdef SIM
+    // Debug: watch signature writes during simulation.
+    always_ff @(posedge clk) begin
+        if (ram_sel && |mem_wstrb && (mem_addr[15:0] == 16'h3F00)) begin
+            $display("%0t soc_top DBG write @%08x data=%08x wstrb=%b", $time, mem_addr, mem_wdata, mem_wstrb);
+        end
+        if (tpu_sel && |mem_wstrb) begin
+            $display("%0t soc_top DBG TPU write @%08x data=%08x wstrb=%b", $time, mem_addr, mem_wdata, mem_wstrb);
+        end
+    end
+`endif
 
     // TPU MMIO decode.
     wire        tpu_sel   = mem_valid && ((mem_addr & TPU_ADDR_MASK) == TPU_BASE_ADDR);

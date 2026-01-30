@@ -113,8 +113,11 @@ helloworldTPU/
 ├── sim/
 │   ├── tb_mac_array.sv     # pure accelerator testbench
 │   └── tb_soc_stub.sv      # PicoRV32+TPU smoke testbench
+├── sw/
+│   └── firmware/           # tiny MMIO smoke firmware (builds tpu_smoke.hex)
 ├── scripts/
-│   └── run_mac_array.sh
+│   ├── run_mac_array.sh
+│   └── build_firmware.sh   # builds outputs/tpu_smoke.hex (set RISCV_PREFIX as needed)
 └── README.md
 ```
 
@@ -122,7 +125,10 @@ helloworldTPU/
 - `soc_top.v` instantiates PicoRV32 with a small on-chip RAM (parameter `MEM_WORDS`, default 16 KB) and memory-maps the TPU at `0x4000_0000`.
 - Firmware is preloaded via `FIRMWARE_HEX` (`$readmemh` of 32-bit words) and starts at `0x0000_0000`; the stack is placed at the top of the BRAM window.
 - TPU offsets are identical to `docs/sys_array_datasheet.md`, but shifted up to the `0x4000_0000` region (e.g. ID at `0x4000_0000`, CTRL at `0x4000_0008`, A/B/C windows at `0x4000_0100/0x4000_0200/0x4000_0300`).
-- Quick sims: `make -C rtl sim` for the accelerator-only bench, `make -C rtl soc_sim` for the PicoRV32+TPU smoke test (VCDs land in `outputs/`).
+- Quick sims:
+  - Accelerator-only: `make -C rtl sim` (VCD `outputs/wave.vcd`).
+  - SoC + firmware: `make -C rtl soc_sim` (builds `outputs/tpu_smoke.hex`, runs smoke firmware that drives the TPU and checks C vs golden; VCD `outputs/soc_stub.vcd`).
+  - Requires a RISC-V bare-metal toolchain; set `RISCV_PREFIX` if your compiler is named differently (default `riscv32-unknown-elf-gcc`).
 
 ---
 
