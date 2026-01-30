@@ -126,9 +126,11 @@ helloworldTPU/
 - Firmware is preloaded via `FIRMWARE_HEX` (`$readmemh` of 32-bit words) and starts at `0x0000_0000`; the stack is placed at the top of the BRAM window.
 - TPU offsets are identical to `docs/sys_array_datasheet.md`, but shifted up to the `0x4000_0000` region (e.g. ID at `0x4000_0000`, CTRL at `0x4000_0008`, A/B/C windows at `0x4000_0100/0x4000_0200/0x4000_0300`).
 - Quick sims:
-  - Accelerator-only: `make -C rtl sim` (VCD `outputs/wave.vcd`).
-  - SoC + firmware: `make -C rtl soc_sim` (builds `outputs/tpu_smoke.hex`, runs smoke firmware that drives the TPU and checks C vs golden; VCD `outputs/soc_stub.vcd`).
-  - Requires a RISC-V bare-metal toolchain; set `RISCV_PREFIX` if your compiler is named differently (default `riscv32-unknown-elf-gcc`).
+  - Accelerator-only: `make -C rtl sim SIM_DEFS=1`
+  - SoC + firmware: `make -C rtl soc_sim SIM_DEFS=1 RISCV_PREFIX=riscv64-unknown-elf`
+  - Outputs: `outputs/wave.vcd` (accel), `outputs/soc_stub.vcd` (SoC) and PASS/FAIL in the console.
+  - Requires a RISC-V bare-metal toolchain; set `RISCV_PREFIX` to match your install (e.g. `riscv64-unknown-elf`).
+  - For synthesis-style builds, drop SIM defines: `SIM_DEFS=0`.
 
 ---
 
