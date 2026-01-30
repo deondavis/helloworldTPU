@@ -23,15 +23,15 @@ Offsets relative to `TPU_BASE` (default 0x0000):
 0x000C STATUS    (RO) bit0=busy, bit1=done
 0x0100-0x010F A window (WO) 16 × 8b, A[r][c] at idx=r*4+c
 0x0200-0x020F B window (WO) 16 × 8b, B[r][c] at idx=r*4+c
-0x0300-0x030F C window (RO) 16 × 32b, C[r][c] at idx=r*4+c
+0x0300-0x033F C window (RO) 16 × 32b, C[r][c] at word offset idx=r*4+c (byte address = 0x0300 + idx*4)
 ```
 
 ## Programmer’s Model
 1) **Write A/B**: For r=0..3, c=0..3, write byte to `A_BASE + (r*4+c)` and `B_BASE + (r*4+c)`.
 2) **Clear done (optional)**: write `0x2` to `CTRL` to clear `done`.
 3) **Start**: write `0x1` to `CTRL` (ignored if `busy=1`).
-4) **Poll**: read `STATUS` until `done=1` (busy clears when run is finished). Fixed latency ≈ `3*N` cycles (12 cycles at `N=4`) from start to done.
-5) **Read C**: read 32-bit words at `C_BASE + (r*4+c)` for all 16 entries.
+4) **Poll**: read `STATUS` until `done=1` (busy drops first, done asserts the following cycle). Fixed latency = `4*N` cycles from start to `busy` dropping (16 cycles at `N=4`), plus one cycle to capture `done`.
+5) **Read C**: read 32-bit words at `C_BASE + ((r*4+c) << 2)` for all 16 entries.
 6) **Repeat**: re-write A/B as needed, clear done if desired, start again.
 
 Notes:
@@ -52,4 +52,5 @@ Notes:
 ## Files
 - RTL: `rtl/tpu_accel/pe.v`, `rtl/tpu_accel/mac_array_4x4.v`, `rtl/tpu_accel/tpu_buffers.v`, `rtl/tpu_accel/tpu_regs.v`, `rtl/tpu_accel/tpu_top.v`
 - Testbench: `sim/tb_mac_array.sv`
-- Run script: `sim/run_mac_array.sh`
+- Run scripts: `scripts/run_mac_array.sh` (accelerator-only sim) and `make -C rtl soc_sim SIM_DEFS=1` (SoC + firmware sim)
+- System integration: TPU is memory-mapped at `0x4000_0000` in the SoC; offsets above are relative to that base.
