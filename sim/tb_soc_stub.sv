@@ -6,7 +6,8 @@ module tb_soc_stub;
     logic rst = 1;
     wire  trap;
 
-    localparam int SIG_BYTE = 32'h3F00;
+    localparam int SIG_BASE = 32'h0C00;
+    localparam int SIG_WORD = SIG_BASE >> 2;
 
     soc_top #(
         .MEM_WORDS(4096),
@@ -36,20 +37,20 @@ module tb_soc_stub;
         end
 
         if (!trap) begin
-            $display("timeout: signature=0x%02x%02x%02x%02x state=%0d busy=%0b done=%0b t_ctr=%0d",
-                     dut.ram[SIG_BYTE+3], dut.ram[SIG_BYTE+2], dut.ram[SIG_BYTE+1], dut.ram[SIG_BYTE+0],
+            $display("timeout: sig_code=0x%08x obs=0x%08x gold=0x%08x state=%0d busy=%0b done=%0b t_ctr=%0d",
+                     dut.ram[SIG_WORD+0], dut.ram[SIG_WORD+1], dut.ram[SIG_WORD+2],
                      dut.u_tpu.state, dut.u_tpu.busy, dut.u_tpu.done, dut.u_tpu.t_ctr);
             $fatal(1, "Timeout waiting for firmware to trap");
         end
 
         $display("soc_stub: trap=%0d after %0d cycles", trap, cycles);
-        $display("soc_stub: signature=0x%02x%02x%02x%02x",
-                 dut.ram[SIG_BYTE+3], dut.ram[SIG_BYTE+2], dut.ram[SIG_BYTE+1], dut.ram[SIG_BYTE+0]);
+        $display("soc_stub: sig_code=0x%08x obs=0x%08x gold=0x%08x",
+                 dut.ram[SIG_WORD+0], dut.ram[SIG_WORD+1], dut.ram[SIG_WORD+2]);
         $display("soc_stub: tpu state=%0d busy=%0b done=%0b t_ctr=%0d",
                  dut.u_tpu.state, dut.u_tpu.busy, dut.u_tpu.done, dut.u_tpu.t_ctr);
-        if ({dut.ram[SIG_BYTE+3], dut.ram[SIG_BYTE+2], dut.ram[SIG_BYTE+1], dut.ram[SIG_BYTE+0]} !== 32'hCAFE0001) begin
-            $fatal(1, "Firmware signature mismatch (got 0x%02x%02x%02x%02x)",
-                   dut.ram[SIG_BYTE+3], dut.ram[SIG_BYTE+2], dut.ram[SIG_BYTE+1], dut.ram[SIG_BYTE+0]);
+        if (dut.ram[SIG_WORD+0] !== 32'hBEEF0000) begin
+            $fatal(1, "Firmware signature mismatch (got 0x%08x obs=0x%08x gold=0x%08x)",
+                   dut.ram[SIG_WORD+0], dut.ram[SIG_WORD+1], dut.ram[SIG_WORD+2]);
         end else begin
             $display("soc_stub: PASS");
         end

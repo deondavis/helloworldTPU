@@ -23,7 +23,7 @@ $(ELF): $(SRCS) linker.ld | $(OUT_DIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
 
 $(HEX): $(ELF)
-	$(OBJCOPY) -O verilog $< $@
+	$(OBJCOPY) -O verilog $< $(HEX)
 
 clean:
 	rm -f $(ELF) $(HEX)

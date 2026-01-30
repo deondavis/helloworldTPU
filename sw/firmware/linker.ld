@@ -21,6 +21,11 @@ SECTIONS
         *(.data*)
     } > RAM
 
+    /* Fixed signature block placed away from code/data. */
+    .sig 0x00000C00 : {
+        KEEP(*(.sig*))
+    } > RAM
+
     .bss (NOLOAD) : {
         *(.bss*)
         *(COMMON)

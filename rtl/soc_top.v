@@ -46,7 +46,7 @@ module soc_top #(
         .ENABLE_PCPI         (0),
         .ENABLE_IRQ          (0),
         .ENABLE_IRQ_TIMER    (0),
-        .PROGADDR_RESET      (32'h0000_0000),
+        .PROGADDR_RESET      (32'h0000_0004),
         .PROGADDR_IRQ        (32'h0000_0010),
         .STACKADDR           (MEM_BYTES - 4)
     ) u_cpu (
@@ -110,48 +110,64 @@ module soc_top #(
         .trace_data  ()
     );
 
-    // On-chip RAM (simple single-ported BRAM style).
-    reg [7:0]  ram [0:MEM_BYTES-1];
+    // On-chip RAM (word-addressed BRAM style).
+    reg [31:0] ram [0:MEM_WORDS-1];
     reg [31:0] ram_rdata;
     reg        ram_ready;
+
+    // Temporary byte-wide buffer used only for firmware preload via $readmemh.
+    reg [7:0] ram_init_bytes [0:MEM_BYTES-1];
 
     // Avoid Xs when no firmware is provided.
     initial begin
         // Fill with NOPs (0x00000013) to avoid Xs.
         for (int i = 0; i < MEM_WORDS; i++) begin
-            ram[(i<<2)+0] = 8'h13;
-            ram[(i<<2)+1] = 8'h00;
-            ram[(i<<2)+2] = 8'h00;
-            ram[(i<<2)+3] = 8'h00;
+            ram[i] = 32'h0000_0013;
         end
         if (FIRMWARE_HEX != "") begin
             $display("soc_top: loading firmware from %s", FIRMWARE_HEX);
-            $readmemh(FIRMWARE_HEX, ram);
+            $readmemh(FIRMWARE_HEX, ram_init_bytes);
+            for (int w = 0; w < MEM_WORDS; w++) begin
+                ram[w] = {ram_init_bytes[(w<<2)+3], ram_init_bytes[(w<<2)+2], ram_init_bytes[(w<<2)+1], ram_init_bytes[(w<<2)+0]};
+            end
         end
     end
 
     wire ram_sel = mem_valid && (mem_addr[31:2] < MEM_WORDS) && (mem_addr[31:28] == 4'h0);
     wire [RAM_ADDR_W-1:0] ram_word_addr = mem_addr[RAM_ADDR_W+1:2];
-    wire [RAM_ADDR_W+1:0] ram_byte_addr = {ram_word_addr, 2'b00};
+
+    reg wrote_once;
 
     always_ff @(posedge clk) begin
         ram_ready <= 1'b0;
         if (rst) begin
             ram_ready <= 1'b0;
+            wrote_once <= 1'b0;
         end else if (ram_sel) begin
             ram_ready <= 1'b1;
-            ram_rdata <= {ram[ram_byte_addr + 3], ram[ram_byte_addr + 2], ram[ram_byte_addr + 1], ram[ram_byte_addr]};
-            if (mem_wstrb[0]) ram[ram_byte_addr + 0] <= mem_wdata[7:0];
-            if (mem_wstrb[1]) ram[ram_byte_addr + 1] <= mem_wdata[15:8];
-            if (mem_wstrb[2]) ram[ram_byte_addr + 2] <= mem_wdata[23:16];
-            if (mem_wstrb[3]) ram[ram_byte_addr + 3] <= mem_wdata[31:24];
+            ram_rdata <= ram[ram_word_addr];
+            if (mem_wstrb[0]) ram[ram_word_addr][7:0]   <= mem_wdata[7:0];
+            if (mem_wstrb[1]) ram[ram_word_addr][15:8]  <= mem_wdata[15:8];
+            if (mem_wstrb[2]) ram[ram_word_addr][23:16] <= mem_wdata[23:16];
+            if (mem_wstrb[3]) ram[ram_word_addr][31:24] <= mem_wdata[31:24];
+
+            // Debug: watch all low-RAM writes and signature address writes.
+            if ((mem_addr[15:0] < 16'h0040) || (mem_addr[15:0] == 16'h0000)) begin
+                $display("%0t soc_top DBG RAM wr @%08x data=%08x wstrb=%b", $time, mem_addr, mem_wdata, mem_wstrb);
+            end
+        end
+
+        // One-shot debug for any write.
+        if (!wrote_once && mem_valid && |mem_wstrb) begin
+            wrote_once <= 1'b1;
+            $display("%0t soc_top DBG ANY write @%08x data=%08x wstrb=%b", $time, mem_addr, mem_wdata, mem_wstrb);
         end
     end
 
 `ifdef SIM
     // Debug: watch signature writes during simulation.
     always_ff @(posedge clk) begin
-        if (ram_sel && |mem_wstrb && (mem_addr[15:0] == 16'h3F00)) begin
+        if (ram_sel && |mem_wstrb && (mem_addr[15:0] == 16'h0C00)) begin
             $display("%0t soc_top DBG write @%08x data=%08x wstrb=%b", $time, mem_addr, mem_wdata, mem_wstrb);
         end
         if (tpu_sel && |mem_wstrb) begin
@@ -189,4 +205,11 @@ module soc_top #(
 
     assign mem_rdata = tpu_sel ? tpu_rdata :
                        ram_sel ? ram_rdata : 32'h0;
+
+    // Instruction fetch tracing for debug.
+    always_ff @(posedge clk) begin
+        if (mem_valid && mem_instr) begin
+            $display("%0t soc_top DBG IFETCH addr=%08x", $time, mem_addr);
+        end
+    end
 endmodule

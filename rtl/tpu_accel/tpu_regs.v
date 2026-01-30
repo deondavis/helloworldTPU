@@ -34,7 +34,7 @@ module tpu_regs #(
 );
     localparam int MAT_ELEMS     = N * N;
     localparam int STREAM_CYCLES = 2 * N;
-    localparam int DRAIN_CYCLES  = N;
+    localparam int DRAIN_CYCLES  = 2 * N; // allow full pipeline drain
     localparam int RUN_CYCLES    = STREAM_CYCLES + DRAIN_CYCLES;
     localparam int TC_WIDTH      = $clog2(RUN_CYCLES + 1);
     localparam int ADDR_W        = $clog2(MAT_ELEMS);
@@ -119,15 +119,19 @@ module tpu_regs #(
                 end
                 S_RUN: begin
                     if (t_ctr == RUN_CYCLES - 1) begin
-                        state        <= S_DONE;
-                        busy         <= 1'b0;
-                        capture_sums <= 1'b1;
-                        t_ctr        <= '0;
+                        state <= S_DONE;
+                        busy  <= 1'b0;
+                        t_ctr <= '0;
                     end else begin
                         t_ctr <= t_ctr + 1'b1;
                     end
                 end
                 S_DONE: begin
+                    // Capture sums one cycle after the run completes to avoid missing the final MAC.
+                    if (!done) begin
+                        capture_sums <= 1'b1;
+                        done         <= 1'b1;
+                    end
                     if (start_pulse) begin
                         state <= S_RUN;
                         busy  <= 1'b1;
@@ -136,10 +140,6 @@ module tpu_regs #(
                     end
                 end
             endcase
-
-            if (capture_sums) begin
-                done <= 1'b1;
-            end
         end
     end
 endmodule
