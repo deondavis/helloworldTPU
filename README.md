@@ -190,7 +190,7 @@ helloworldTPU/
 
 ---
 
-### 🔵 Phase 1 — 4×4 MAC Array in Simulation (Correctness First)
+### 🔵 Phase 1 — 4×4 MAC Array in Simulation (Correctness First) — **DONE (SIM)**
 **Outcome:** A 4×4 MAC array passes self-checking tests in simulation.
 
 **Tools used**
@@ -214,11 +214,12 @@ helloworldTPU/
 **Effort:** 15–30 hours
 
 **Exit criteria**
-- 100+ randomized tests pass in simulation.
+- 100+ randomized tests pass in simulation. ✅ (accelerator-only and SoC smoke sims now pass with firmware checksum 0x0000027c)
 
 ---
 
-### 🟣 Phase 2 — PicoRV32 SoC Bring-up (MMIO Peripheral Pattern)
+### 🟣 Phase 2 — PicoRV32 SoC Bring-up (MMIO Peripheral Pattern) — **IN PROGRESS (SIM)**  
+*Waiting on FPGA hardware delivery; SoC + TPU smoke passes in simulation.*
 **Outcome:** PicoRV32 boots firmware and can talk to an MMIO peripheral.
 
 **Tools used**
@@ -240,11 +241,12 @@ helloworldTPU/
 **Effort:** 20–40 hours
 
 **Exit criteria**
-- Firmware prints over UART and toggles LEDs via MMIO writes.
+- Firmware prints over UART and toggles LEDs via MMIO writes (pending hardware).
 
 ---
 
-### 🟠 Phase 3 — TPU Accelerator MMIO + BRAM Tile Buffers (Single-Tile Compute)
+### 🟠 Phase 3 — TPU Accelerator MMIO + BRAM Tile Buffers (Single-Tile Compute) — **DONE (SIM)**  
+*CPU loads A/B, starts accelerator, and reads C successfully in simulation.*
 **Outcome:** CPU can load A/B tiles, start accelerator, and read back C.
 
 **Tools used**
@@ -268,7 +270,7 @@ helloworldTPU/
 **Effort:** 30–60 hours
 
 **Exit criteria**
-- Hardware matches CPU reference for one 4×4 output tile across random tests.
+- Hardware matches CPU reference for one 4×4 output tile across random tests (SIM ✅; HW pending board).
 
 ---
 
@@ -361,11 +363,10 @@ helloworldTPU/
 ---
 
 ## Immediate Next Steps
-1) Lock `K_TILE = 32`
-2) Implement and simulate `pe.v` and `mac_array_4x4.v`
-3) Bring up PicoRV32 UART + MMIO LED reg
-4) Implement TPU MMIO windows for A/B/C
-5) Write `tpu_selftest` and run it daily
+1) Hardware bring-up once Tang Nano 9K arrives: flash SoC + TPU bitstream, verify UART and MMIO writes/reads.
+2) Run TPU smoke firmware on hardware; compare C buffer vs CPU golden (already matching in sim).
+3) Trim SIM debug (`SIM_DEFS=0`) for synth builds; keep `SIM_DEFS=1` for sims.
+4) Begin tiled GEMM firmware (Phase 4) after HW validation.
 
 ---
 
