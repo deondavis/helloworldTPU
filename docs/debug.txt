@@ -1,0 +1,20 @@
+Math firmware debug notes (resolved)
+------------------------------------
+Summary of failure (fixed):
+- Firmware drove 4×4 matmul via TPU MMIO, expected PASS code 0xBEEF0000 with checksum 0x0000027C.
+- soc_sim was reporting 0xBAD00010 / checksum 0x00000078 (16 mismatches). First mismatch was C[0]=0x0C vs 0x0D (before checksum mode).
+- TPU state at trap: state=2 (DONE), busy=0, done=1.
+
+Root cause:
+- MMIO address stride for the C window was wrong: CPU read/write logic used byte offsets but C is word-addressed (idx*4). Reads were aliasing to the first word lane.
+- TPU MMIO decode in the SoC also forwarded byte-lane writes without lane-shifting the address/data to the TPU block.
+
+Fixes applied:
+- `rtl/tpu_accel/tpu_regs.v`: C window read index now uses `(mmio_addr - C_BASE) >> 2`; buffer write addresses use full byte offsets (no shared mmio_low).
+- `sim/tb_mac_array.sv`: C reads use `C_BASE + ((r*N+c) << 2)`.
+- `rtl/soc_top.v`: MMIO byte-lane aware address/data forwarding to TPU (shift address/data by active byte lane).
+- Added SIM guards and SIM_DEFS flag so debug `$display` is sim-only.
+
+Verification:
+- Accelerator-only sim: checksum 0x0000027C, no mismatches.
+- SoC + firmware sim (RISCV_PREFIX=riscv64-unknown-elf): signature 0xBEEF0000, checksum 0x0000027C, buffers match golden.
