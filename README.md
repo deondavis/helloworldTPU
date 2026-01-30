@@ -96,42 +96,33 @@ Development environment: **Fedora-based PC** (native Linux workflow).
 
 ```
 helloworldTPU/
+├── docs/
+│   └── sys_array_datasheet.md
+├── outputs/                # sim/build artifacts
 ├── rtl/
-│   ├── soc_top.v
-│   ├── picorv32_wrap.v
-│   ├── uart.v
-│   ├── mmio_decode.v
+│   ├── Makefile
+│   ├── soc_top.v           # PicoRV32 + BRAM + TPU MMIO glue
+│   ├── third_party/
+│   │   └── picorv32.v      # vendored PicoRV32 core
 │   ├── tpu_accel/
 │   │   ├── tpu_top.v
 │   │   ├── tpu_regs.v
 │   │   ├── tpu_buffers.v
 │   │   ├── mac_array_4x4.v
 │   │   └── pe.v
-│   └── gowin_pll.v
 ├── sim/
-│   ├── tb_mac_array.sv
-│   ├── tb_tpu_top.sv
-│   ├── vectors/
-│   └── run.sh
-├── sw/
-│   ├── linker.ld
-│   ├── crt0.S
-│   ├── include/
-│   │   └── tpu.h
-│   ├── lib/
-│   │   └── tpu.c
-│   └── apps/
-│       ├── hello_uart/
-│       ├── tpu_selftest/
-│       └── mlp_infer/
-├── constraints/
-│   └── tangnano9k.cst
+│   ├── tb_mac_array.sv     # pure accelerator testbench
+│   └── tb_soc_stub.sv      # PicoRV32+TPU smoke testbench
 ├── scripts/
-│   ├── build_hw.sh
-│   ├── flash.sh
-│   └── build_sw.sh
+│   └── run_mac_array.sh
 └── README.md
 ```
+
+### PicoRV32 SoC + TPU glue
+- `soc_top.v` instantiates PicoRV32 with a small on-chip RAM (parameter `MEM_WORDS`, default 16 KB) and memory-maps the TPU at `0x4000_0000`.
+- Firmware is preloaded via `FIRMWARE_HEX` (`$readmemh` of 32-bit words) and starts at `0x0000_0000`; the stack is placed at the top of the BRAM window.
+- TPU offsets are identical to `docs/sys_array_datasheet.md`, but shifted up to the `0x4000_0000` region (e.g. ID at `0x4000_0000`, CTRL at `0x4000_0008`, A/B/C windows at `0x4000_0100/0x4000_0200/0x4000_0300`).
+- Quick sims: `make -C rtl sim` for the accelerator-only bench, `make -C rtl soc_sim` for the PicoRV32+TPU smoke test (VCDs land in `outputs/`).
 
 ---
 
